@@ -46,6 +46,10 @@ WENN SIE AUF DIE MOEGLICHKEIT EINES SOLCHEN SCHADENS HINGEWIESEN WORDEN SIND.
 #include <GxIO/GxIO_SPI/GxIO_SPI.cpp>
 #include <GxIO/GxIO.cpp>
 
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
+#include "qr1.h"
+#include "qr2.h"
 
 //
 // Debug messages over the serial console.
@@ -296,12 +300,16 @@ void setup(void){
   Serial.begin(115200); 
  // delay(5000);
 //  Serial.println("");
- 
+   // setup the display
+  display.init();
+    display.fillScreen(GxEPD_WHITE);
+    display.setTextColor(GxEPD_BLACK);
+
   WiFi.persistent(true);
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
-  WiFi.begin("judffgsduifg","75fBWSJumwfOsIb5Kqvvr3vPyoylBcAoSkbB6D4W90BY5IFTDC5XwpCgRELiBeU"); // reading data from EPROM, (last saved credentials)
-//  WiFi.begin(WiFi.SSID().c_str(),WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
+//  WiFi.begin("judffgsduifg","75fBWSJumwfOsIb5Kqvvr3vPyoylBcAoSkbB6D4W90BY5IFTDC5XwpCgRELiBeU"); // reading data from EPROM, (last saved credentials)
+  WiFi.begin(WiFi.SSID().c_str(),"huihu");//WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
 //  WiFi.begin("foobar",WiFi.psk().c_str()); // making sure access point and if not configured in time (180 sec), wps happen
  
   pinMode(LED_BUILTIN, OUTPUT);
@@ -330,6 +338,20 @@ void setup(void){
   if(status == WL_CONNECTED) {
     Serial.printf("\nConnected successful to SSID '%s'\n", WiFi.SSID().c_str());
   } else {
+  display.setRotation(2);
+  display.setFont(&FreeMonoBold18pt7b);
+  display.setCursor(0, 0);
+  display.println();
+  display.println("Please connect to SSID");
+  display.println("AutoConnectAP_ePaper!");
+    display.drawExampleBitmap(gImage_IMG_0002, 270, 90, 100, 100, GxEPD_BLACK);
+    display.setCursor(0,200);
+  display.println();
+  display.println("Then open configuration at");
+  display.println("http://192.168.4.1!");
+    display.drawExampleBitmap(gImage_IMG_0001, 270, 290, 100, 100, GxEPD_BLACK);
+    display.update();
+  display.setRotation(0);
     WiFi.mode(WIFI_OFF);
     //WiFiManager
     //Local intialization. Once its business is done, there is no need to keep it around
@@ -396,17 +418,10 @@ void setup(void){
     // Clear the display.
     //
   Serial.println("clear Display");
-  // setup the display
-  display.init();
-    display.fillScreen(GxEPD_WHITE);
-    display.setTextColor(GxEPD_BLACK);
 
     //
     // Trigger the update of the display.
     //
-      Serial.println("Update Display");
-
-//    display.update();
 //  Serial.println("Setup done!");
     char *two = "/Hardware/d1-epaper/wss.pbm";
             display_url(two);
