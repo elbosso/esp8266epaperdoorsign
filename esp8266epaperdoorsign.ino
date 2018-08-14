@@ -32,6 +32,7 @@ UNERLAUBTE HANDLUNG (INKLUSIVE FAHRLAESSIGKEIT) VERANTWORTLICH, AUF WELCHEM
 WEG SIE AUCH IMMER DURCH DIE BENUTZUNG DIESER SOFTWARE ENTSTANDEN SIND, SOGAR, 
 WENN SIE AUF DIE MOEGLICHKEIT EINES SOLCHEN SCHADENS HINGEWIESEN WORDEN SIND.
 */
+#include <FS.h> //this needs to be first, or it all crashes and burns...
 
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
@@ -50,6 +51,7 @@ WENN SIE AUF DIE MOEGLICHKEIT EINES SOLCHEN SCHADENS HINGEWIESEN WORDEN SIND.
 #include <Fonts/FreeMonoBold24pt7b.h>
 #include "qr1.h"
 #include "qr2.h"
+#include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson
 
 //
 // Debug messages over the serial console.
@@ -73,6 +75,21 @@ bool lamp = 0;
 GxIO_Class io(SPI, SS, 0, 2);
 GxEPD_Class display(io);
 
+char port[6] = "80";
+    //
+    // The host we're going to fetch from.
+    //
+char host[100] = "apache2.fritz.box";
+char path[100] = "/Hardware/d1-epaper/wss.pbm";
+
+//flag for saving data
+bool shouldSaveConfig = false;
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
 
 //
 // Fetch and display the image specified at the given URL
@@ -85,11 +102,6 @@ void display_url(const char * m_path)
     display.fillScreen(GxEPD_WHITE);
     display.setTextColor(GxEPD_BLACK);
 
-    //
-    // The host we're going to fetch from.
-    //
-    char m_host[] = "apache2.fritz.box";
-
     char m_tmp[50] = { '\0' };
     memset(m_tmp, '\0', sizeof(m_tmp));
 
@@ -97,7 +109,7 @@ void display_url(const char * m_path)
      * Create a HTTP client-object.
      */
     WiFiClient m_client;
-    int port = 80;
+    int iport = atoi(port);
 
     //
     // Keep track of where we are.
@@ -108,13 +120,13 @@ void display_url(const char * m_path)
     long now;
 
     Serial.println("About to make the connection to");
-    Serial.println(m_host);
+    Serial.println(host);
     Serial.println(m_path);
 
     //
     // Connect to the remote host, and send the HTTP request.
     //
-    if (!m_client.connect(m_host, port))
+    if (!m_client.connect(host, iport))
     {
         Serial.println("Failed to connect");
         return;
@@ -126,7 +138,7 @@ void display_url(const char * m_path)
     m_client.print(m_path);
     m_client.println(" HTTP/1.0");
     m_client.print("Host: ");
-    m_client.println(m_host);
+    m_client.println(host);
     m_client.println("User-Agent: epaper-web-image/1.0");
     m_client.println("Connection: close");
     m_client.println("");
@@ -300,6 +312,52 @@ void setup(void){
   Serial.begin(115200); 
  // delay(5000);
 //  Serial.println("");
+  //clean FS, for testing
+  //SPIFFS.format();
+String realSize = String(ESP.getFlashChipRealSize());
+String ideSize = String(ESP.getFlashChipSize());
+bool flashCorrectlyConfigured = realSize.equals(ideSize);
+
+  //read configuration from FS json
+  Serial.println("mounting FS...");
+
+//  if(flashCorrectlyConfigured)
+  {
+  if (SPIFFS.begin()) {
+    Serial.println("mounted file system");
+    if (SPIFFS.exists("/config.json")) {
+      //file exists, reading and loading
+      Serial.println("reading config file");
+      File configFile = SPIFFS.open("/config.json", "r");
+      if (configFile) {
+        Serial.println("opened config file");
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.parseObject(buf.get());
+        json.printTo(Serial);
+        if (json.success()) {
+          Serial.println("\nparsed json");
+          strcpy(port, json["port"]);
+          strcpy(host, json["host"]);
+          strcpy(path, json["path"]);
+        } else {
+          Serial.println("failed to load json config");
+        }
+      }
+    }
+  } else {
+    Serial.println("failed to mount FS");
+  }
+  //end read
+  }
+//  else
+//    else Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
+
+
    // setup the display
   display.init();
     display.fillScreen(GxEPD_WHITE);
@@ -309,7 +367,7 @@ void setup(void){
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
 //  WiFi.begin("judffgsduifg","75fBWSJumwfOsIb5Kqvvr3vPyoylBcAoSkbB6D4W90BY5IFTDC5XwpCgRELiBeU"); // reading data from EPROM, (last saved credentials)
-  WiFi.begin(WiFi.SSID().c_str(),"huihu");//WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
+  WiFi.begin(WiFi.SSID().c_str(),WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
 //  WiFi.begin("foobar",WiFi.psk().c_str()); // making sure access point and if not configured in time (180 sec), wps happen
  
   pinMode(LED_BUILTIN, OUTPUT);
@@ -356,6 +414,16 @@ void setup(void){
     //WiFiManager
     //Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wifiManager;
+      //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+    WiFiManagerParameter custom_port("Port", "Port", port, 5);
+    WiFiManagerParameter custom_host("Host", "Host", host, 99);
+    WiFiManagerParameter custom_path("Path", "Path", path, 99);
+    wifiManager.addParameter(&custom_port);
+    wifiManager.addParameter(&custom_host);
+    wifiManager.addParameter(&custom_path);
+    
     //reset settings - for testing
     //wifiManager.resetSettings();
   
@@ -405,7 +473,39 @@ void setup(void){
         }
       }
     }
-  } 
+    else
+    {
+      Serial.println(custom_port.getValue());
+      Serial.println(custom_host.getValue());
+      Serial.println(custom_path.getValue());
+      strcpy(port, custom_port.getValue());
+      strcpy(host, custom_host.getValue());
+      strcpy(path, custom_path.getValue());
+
+  //save the custom parameters to FS
+  if (shouldSaveConfig) {
+    Serial.println("saving config");
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.createObject();
+    json["host"] = host;
+    json["port"] = port;
+    json["path"] = path;
+
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+      Serial.println("failed to open config file for writing");
+    }
+
+    json.printTo(Serial);
+    json.printTo(configFile);
+    configFile.close();
+    //end save
+  }
+
+    }
+  }
+
+  
 
   
   Serial.println("Verbunden");
@@ -423,8 +523,8 @@ void setup(void){
     // Trigger the update of the display.
     //
 //  Serial.println("Setup done!");
-    char *two = "/Hardware/d1-epaper/wss.pbm";
-            display_url(two);
+//    char *two = "/Hardware/d1-epaper/wss.pbm";
+            display_url(path);
 //Serial.println("Going into deep sleep for 20 seconds");
 //ESP.deepSleep(20e6); // 20e6 is 20 microseconds
 Serial.println("Going into deep sleep for 10 minutes");
