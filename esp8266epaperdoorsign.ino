@@ -85,6 +85,8 @@ char path[100] = "/Hardware/d1-epaper/wss.pbm";
 //flag for saving data
 bool shouldSaveConfig = false;
 
+int gpio0Switch = 5;
+
 //callback notifying us of the need to save config
 void saveConfigCallback () {
   Serial.println("Should save config");
@@ -314,6 +316,8 @@ void setup(void){
 //  Serial.println("");
   //clean FS, for testing
   //SPIFFS.format();
+  pinMode(gpio0Switch,INPUT_PULLUP);  // Push Button for GPIO0 active LOW
+
 String realSize = String(ESP.getFlashChipRealSize());
 String ideSize = String(ESP.getFlashChipSize());
 bool flashCorrectlyConfigured = realSize.equals(ideSize);
@@ -367,8 +371,15 @@ bool flashCorrectlyConfigured = realSize.equals(ideSize);
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
 //  WiFi.begin("judffgsduifg","75fBWSJumwfOsIb5Kqvvr3vPyoylBcAoSkbB6D4W90BY5IFTDC5XwpCgRELiBeU"); // reading data from EPROM, (last saved credentials)
-  WiFi.begin(WiFi.SSID().c_str(),WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
-//  WiFi.begin("foobar",WiFi.psk().c_str()); // making sure access point and if not configured in time (180 sec), wps happen
+Serial.println(digitalRead(gpio0Switch) == HIGH?"HIGH":"LOW");
+  if(digitalRead(gpio0Switch) == HIGH)
+    WiFi.begin(WiFi.SSID().c_str(),WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
+  else
+  {
+  WiFi.persistent(false);
+   WiFi.begin("geht","nicht");
+  WiFi.persistent(true);
+  }
  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, lamp);
