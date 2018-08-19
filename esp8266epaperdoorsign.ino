@@ -58,6 +58,11 @@ WENN SIE AUF DIE MOEGLICHKEIT EINES SOLCHEN SCHADENS HINGEWIESEN WORDEN SIND.
 //
 #include "debug.h"
 
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include <TimeLib.h>
+#include <Timezone.h>    // https://github.com/JChristensen/Timezone
+#include <stdio.h>
 
 
 //Your Wifi SSID
@@ -86,6 +91,27 @@ char path[100] = "/Hardware/d1-epaper/wss.pbm";
 bool shouldSaveConfig = false;
 
 int gpio0Switch = 5;
+
+unsigned long previousMillis = 0;
+
+WiFiUDP ntpUDP;
+
+// By default 'pool.ntp.org' is used with 60 seconds update interval and
+// no offset
+NTPClient timeClient(ntpUDP,"2.de.pool.ntp.org");
+
+// You can specify the time server pool and the offset, (in seconds)
+// additionaly you can specify the update interval (in milliseconds).
+// NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+
+// Central European Time (Frankfurt, Paris)
+TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 120};     // Central European Summer Time
+TimeChangeRule CET = {"CET ", Last, Sun, Oct, 3, 60};       // Central European Standard Time
+Timezone CE(CEST, CET);
+
+char timestrbuf[100];
+
+unsigned long lastmassaged;
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -302,7 +328,7 @@ void display_url(const char * m_path)
     Serial.println("Nothing more is available - terminating");
     m_client.stop();
 
-
+    WiFi.mode(WIFI_OFF);
     //
     // Trigger the update of the display.
     //
@@ -525,6 +551,32 @@ Serial.println(digitalRead(gpio0Switch) == HIGH?"HIGH":"LOW");
 
   Serial.println("Led aus!");
   digitalWrite(LED_BUILTIN, HIGH);
+
+    timeClient.begin();
+  Serial.println("NTP client started");
+  timeClient.update();
+  Serial.println(timeClient.getFormattedTime());
+  unsigned long epoch=timeClient.getEpochTime();
+  Serial.println(epoch);
+
+    TimeChangeRule *tcr;
+    time_t utc;
+    utc = epoch;
+
+    time_t local=CE.toLocal(utc, &tcr);
+    Serial.println(local);
+    time_t tenmin=60*60;
+    time_t massaged=((local+(lastmassaged==0?0:tenmin))/tenmin)*tenmin;
+      massaged+=58*60;
+    if(massaged<local)
+      massaged+=tenmin;
+    if((lastmassaged!=0)&&(hour(massaged)==hour(local)))
+      massaged+=tenmin;
+
+
+    printTimeToBuffer(local,tcr -> abbrev);
+    Serial.println(timestrbuf);
+
     //
     // Clear the display.
     //
@@ -535,12 +587,30 @@ Serial.println(digitalRead(gpio0Switch) == HIGH?"HIGH":"LOW");
     //
 //  Serial.println("Setup done!");
 //    char *two = "/Hardware/d1-epaper/wss.pbm";
+    if((hour(local))>6&&(hour(local)<18))
             display_url(path);
+    else
+      Serial.println("not updating display at night!");
 //Serial.println("Going into deep sleep for 20 seconds");
 //ESP.deepSleep(20e6); // 20e6 is 20 microseconds
-Serial.println("Going into deep sleep for 10 minutes");
-ESP.deepSleep(600e6); // 20e6 is 20 microseconds
+    Serial.print("Going into deep sleep - waking up at: ");
+    printTimeToBuffer(massaged,tcr -> abbrev);
+    Serial.println(timestrbuf);
+    Serial.println(massaged-local);
+    lastmassaged=massaged;
+    ESP.deepSleep((massaged-local)*1e06); // 20e6 is 20 microseconds
 }
+void printTimeToBuffer(time_t t, char *tz)
+{
+  //this is needed because dayShortStr and monthShortStr obviously use the same buffer so we get
+  //20:30:59 Aug 17 Aug 2018 CEST
+  //instead of 
+  //20:30:59 Fri 17 Aug 2018 CEST
+  //if we dont do this!
+  String wd(dayShortStr(weekday(t)));
+  sprintf(timestrbuf,"%02d:%02d:%02d %s %02d %s %d %s",hour(t),minute(t),second(t),wd.c_str(),day(t),monthShortStr(month(t)),year(t),tz);
+}
+
 void loop(void){
 /*//    char *one = "/Hardware/d1-epaper/knot.dat";
 //    char *two = "/Hardware/d1-epaper/skull.dat";
