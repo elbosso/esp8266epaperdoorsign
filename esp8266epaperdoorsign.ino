@@ -63,6 +63,7 @@
 #include <TimeLib.h>
 #include <Timezone.h>    // https://github.com/JChristensen/Timezone
 #include <stdio.h>
+#include <user_interface.h>
 
 
 //Your Wifi SSID
@@ -111,7 +112,6 @@ Timezone CE(CEST, CET);
 
 char timestrbuf[100];
 
-unsigned long lastmassaged;
 
 //callback notifying us of the need to save config
 void saveConfigCallback ()
@@ -339,6 +339,8 @@ void display_url(const char * m_path)
 
 void setup(void)
 {
+  rst_info *resetInfo;
+  resetInfo = ESP.getResetInfoPtr();
   Serial.begin(115200);
   // delay(5000);
   //  Serial.println("");
@@ -594,9 +596,24 @@ void setup(void)
   unsigned long mo = month(local);
   unsigned long d = day(local);
 
+  Serial.print("local: ");
+  printTimeToBuffer(local, tcr -> abbrev);
+  Serial.println(timestrbuf);
   unsigned long zerohour = local - s - mi * 60 - h * 60 * 60;
-  unsigned long massaged = zerohour + 60 * 58 + (h + 1) * 60 * 60;
-
+  Serial.print("zerohour: ");
+  printTimeToBuffer(zerohour, tcr -> abbrev);
+  Serial.println(timestrbuf);
+  Serial.println(mi);
+  Serial.println(resetInfo->reason);
+  unsigned long massaged = zerohour + 60 * 58 + (((resetInfo->reason == REASON_DEEP_SLEEP_AWAKE)||(mi>=58))?(h + 1):h) * 60 * 60;
+/*  Serial.print("massaged (first start): ");
+  printTimeToBuffer(massaged, tcr -> abbrev);
+  Serial.println(timestrbuf);
+  lastmassaged=10;
+  massaged = zerohour + 60 * 58 + (((lastmassaged>0)||(mi>=58))?(h + 1):h) * 60 * 60;
+*/  Serial.print("massaged: ");
+  printTimeToBuffer(massaged, tcr -> abbrev);
+  Serial.println(timestrbuf);
   //
   // Trigger the update of the display.
   //
@@ -618,7 +635,6 @@ void setup(void)
   printTimeToBuffer(massaged, tcr -> abbrev);
   Serial.println(timestrbuf);
   Serial.println(massaged - local);
-  lastmassaged = massaged;
   ESP.deepSleep((massaged - local) * 1e06); // 20e6 is 20 microseconds
 }
 void printTimeToBuffer(time_t t, char *tz)
