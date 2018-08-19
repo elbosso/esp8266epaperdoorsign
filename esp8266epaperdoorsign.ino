@@ -565,22 +565,16 @@ Serial.println(digitalRead(gpio0Switch) == HIGH?"HIGH":"LOW");
 
     time_t local=CE.toLocal(utc, &tcr);
     Serial.println(local);
-    time_t tenmin=60*60;
-    time_t massaged=((local+(lastmassaged==0?0:tenmin))/tenmin)*tenmin;
-      massaged+=58*60;
-    if(massaged<local)
-      massaged+=tenmin;
-    if((lastmassaged!=0)&&(hour(massaged)==hour(local)))
-      massaged+=tenmin;
 
+    unsigned long h=hour(local);
+    unsigned long mi=minute(local);
+    unsigned long s=second(local);
+    unsigned long y=year(local);
+    unsigned long mo=month(local);
+    unsigned long d=day(local);
 
-    printTimeToBuffer(local,tcr -> abbrev);
-    Serial.println(timestrbuf);
-
-    //
-    // Clear the display.
-    //
-  Serial.println("clear Display");
+    unsigned long zerohour=local-s-mi*60-h*60*60;
+    unsigned long massaged=zerohour+60*58+(h+1)*60*60;
 
     //
     // Trigger the update of the display.
@@ -588,7 +582,13 @@ Serial.println(digitalRead(gpio0Switch) == HIGH?"HIGH":"LOW");
 //  Serial.println("Setup done!");
 //    char *two = "/Hardware/d1-epaper/wss.pbm";
     if((hour(local))>6&&(hour(local)<18))
+    {
+    //
+    // Clear the display.
+    //
+  Serial.println("clear Display");
             display_url(path);
+    }
     else
       Serial.println("not updating display at night!");
 //Serial.println("Going into deep sleep for 20 seconds");
