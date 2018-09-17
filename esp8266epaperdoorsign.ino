@@ -34,6 +34,9 @@
 */
 #include <FS.h> //this needs to be first, or it all crashes and burns...
 
+//#define AT_HOME 0
+//#define REGELBETRIEB 1
+
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
@@ -64,6 +67,7 @@
 #include <Timezone.h>    // https://github.com/JChristensen/Timezone
 #include <stdio.h>
 #include <user_interface.h>
+#include "wifi_security.h"
 
 
 //Your Wifi SSID
@@ -86,7 +90,7 @@ char port[6] = "80";
 // The host we're going to fetch from.
 //
 char host[100] = "apache2.fritz.box";
-char path[100] = "/Hardware/d1-epaper/wss.pbm";
+char path[100] = "/br.pbm";
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -408,7 +412,7 @@ void setup(void)
   WiFi.persistent(true);
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
-  //  WiFi.begin("judffgsduifg","75fBWSJumwfOsIb5Kqvvr3vPyoylBcAoSkbB6D4W90BY5IFTDC5XwpCgRELiBeU"); // reading data from EPROM, (last saved credentials)
+#ifdef REGELBETRIEB
   Serial.println(digitalRead(gpio0Switch) == HIGH ? "HIGH" : "LOW");
   if (digitalRead(gpio0Switch) == HIGH)
     WiFi.begin(WiFi.SSID().c_str(), WiFi.psk().c_str()); // reading data from EPROM, (last saved credentials)
@@ -418,6 +422,9 @@ void setup(void)
     WiFi.begin("geht", "nicht");
     WiFi.persistent(true);
   }
+#else
+  WiFi.begin(wifi_ssid,wifi_pwd); // reading data from EPROM, (last saved credentials)
+#endif
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, lamp);
