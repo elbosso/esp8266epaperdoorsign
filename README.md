@@ -11,6 +11,7 @@
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/elbosso/esp8266epaperdoorsign/issues)
 [![GitHub contributors](https://img.shields.io/github/contributors/elbosso/esp8266epaperdoorsign.svg)](https://GitHub.com/elbosso/esp8266epaperdoorsign/graphs/contributors/)
 [![Github All Releases](https://img.shields.io/github/downloads/elbosso/esp8266epaperdoorsign/total.svg)](https://github.com/elbosso/esp8266epaperdoorsign)
+[![Website elbosso.github.io](https://img.shields.io/website-up-down-green-red/https/elbosso.github.io.svg)](https://elbosso.github.io/)
 
 I got my inspiration from https://ct.de/yrzv, however i wanted to use only an ESP8266. I came upon https://github.com/skx/esp8266, however i resented the idea of inventing yet another image format when http://netpbm.sourceforge.net/doc/pbm.html has been around for decades (and i also loathe php).
 
